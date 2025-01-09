@@ -2,6 +2,11 @@
 
 // gerekli modülleri çağırdık
 const http = require("http");
+const fs = require("fs");
+const url = require("url");
+
+// kendi oluşturduğumuz fonksiyonu import et
+const replaceTemplate = require("./modules/replaceTemplate");
 
 /*
  * createServer(), veridğimiz dinleyici fonksiyonu api'a her istek geldiğinde tetikler.
@@ -12,36 +17,56 @@ const http = require("http");
  * Bu fonksiyon içerisinde gelen isteğe göre cevap gönderilir.
  */
 
-// http.createServer fonksiyonu, bir HTTP sunucusu oluşturur.
-// request ve response parametreleri:
-// request: Gelen isteğin tüm bilgilerini içerir (istek türü, başlıklar, URL vb.).
-//   response: Sunucunun, istemciye(tarayıcıya veya başka bir uygulamaya) göndereceği cevabı temsil eder
+/*
+ * Routing
+ * API'a gelen isteğin hangi endpoint (uç nokta / yol)'e geldiğini tespit edip ona göre farklı cevaplar gönderme işlemine routing denir
+ * Routing için client'ın hangi yola ve hangi http methodu ile istek attığını bilmemiz gerekiyor.
+ */
+
+// html şablon verilerine eriş
+let tempOverview = fs.readFileSync("./templates/overview.html", "utf-8");
+let tempProduct = fs.readFileSync("./templates/product.html", "utf-8");
+let tempCard = fs.readFileSync("./templates/card.html", "utf-8");
+
+// json dosyaınsdaki verilere eriş
+let jsonData = fs.readFileSync("./dev-data/data.json", "utf-8");
+
+// json verisini js formatına çevir
+const data = JSON.parse(jsonData);
 
 const server = http.createServer((request, response) => {
-  console.log(" API'ya istek geldi");
+  console.log("🥳🥳 API'a istek Geldi 🎉🎉");
 
-  // gelen isteğin detyalarını konsola yazdır
-  //   request.method: Gelen isteğin türünü verir (örneğin, GET, POST, PUT, DELETE).
-  // Bu satır, sunucuya gelen isteğin türünü konsola yazdırır.
-  console.log(request.method + "isteği geldi");
+  // istek url'ini parçalara ayırdık
+  const { query, pathname } = url.parse(request.url, true);
 
-  // gelen isteğe gönderilecek cevap
-  //   response.end: Gelen isteğe bir yanıt gönderir ve bağlantıyı kapatır.
-  // "serve tarafından selamlar!!!" mesajı, istemciye gönderilen yanıt içeriğidir.
-  response.end("serve tarafından selamlar!!!");
+  // gelen istğin url'ine göre farklı cevap gönder
+  switch (pathname) {
+    case "/overview":
+      // meyveler dizisibdeki eleman sayısı kadar kart oluştur
+      const cards = data.map((el) => replaceTemplate(tempCard, el));
+
+      // anasayfa html'indeki kartlar alanına kart html kodlarını ekle
+      tempOverview = tempOverview.replace("{%PRODUCT_CARDS%}", cards);
+
+      return response.end(tempOverview);
+
+    case "/product":
+      // 1) dizideki doğru elemanı bul
+      const item = data.find((item) => item.id == query.id);
+
+      // 2) detay sayfasının html'ini bulunan elemanın verilerine göre güncelle
+      const output = replaceTemplate(tempProduct, item);
+
+      // 3) güncel html'i client'a gönder
+      return response.end(output);
+
+    default:
+      return response.end("<h1>Tanimlanmayan Yol </h1>");
+  }
 });
 
-// bir dinleyici oluşturup hangi porta gelen isteklerin dinleneceğini söylemliyiz.
-// server.listen(1616, "127.0.0.1"):
-// Sunucu, 127.0.0.1 IP adresi (localhost) ve 1616 portunda dinlemeye başlar.
-// İstemciden bu IP ve porta gelen her isteği yakalayarak işleyecek.
-// Callback fonksiyonu (() => {}) sunucunun başarıyla başlatıldığını belirten bir mesajı konsola yazdırır.
-
-server.listen(1616, "127.0.0.1", () => {
-  console.log("IP adresinin 1616 portuna gelen istekler dinlenmeye alındı");
+// Bir dinleyeci oluşturup hangi porta gelen isteklerin dinleneceğini söylemeliyiz
+server.listen(3535, "127.0.0.1", () => {
+  console.log("🎾 IP adresinin 3535 portuna gelen istekler dinlemeye alındı");
 });
-
-// Bu kodu çalıştırdığınızda:
-
-// Sunucu 127.0.0.1:1616 üzerinde çalışacak.
-// Tarayıcıdan veya başka bir istemciden bu adrese bir istek gönderildiğinde, konsolda isteğin türü görünecek ve istemciye "serve tarafından selamlar!!!" mesajı dönecek.
